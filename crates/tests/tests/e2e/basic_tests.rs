@@ -2,7 +2,7 @@ use http::Method;
 use http::header::{AUTHORIZATION, CONTENT_TYPE, HeaderValue};
 use rapira_sapi::plugin::Mode;
 use tests::wire::submit;
-use tests::{drain, fixture, req, server_log};
+use tests::{drain, drain_resp, fixture, req, server_log};
 
 use crate::harness::{Server, Spawn, scratch_dir, slot_line};
 
@@ -58,33 +58,62 @@ fn fibers_stress_worker() -> anyhow::Result<()> {
     Ok(())
 }
 
+struct TeardownBailout {
+    name: &'static str,
+    query: &'static str,
+    status: u16,
+    body: &'static str,
+    truncated: bool,
+}
+
+/// The seal runs inside rapira_request_teardown, so a bailout of the flush right before it must still reach the client.
 #[test]
 fn worker_survives_teardown_bailout() -> anyhow::Result<()> {
+    let cases = [
+        TeardownBailout {
+            name: "buffered output: the seal commits a 500 head",
+            query: "/?boom=1",
+            status: 500,
+            body: "",
+            truncated: false,
+        },
+        TeardownBailout {
+            name: "streamed output: the seal marks the cut",
+            query: "/?boom=2",
+            status: 200,
+            body: "part",
+            truncated: true,
+        },
+    ];
     let srv = Spawn::http(Mode::Worker, fixture("shared/teardown-bailout-worker.php")).spawn();
     let (s1, b1) = drain(submit(srv.addr, req("/?boom=0"))?);
-    let (s2, b2) = drain(submit(srv.addr, req("/?boom=1"))?);
-    let (s3, b3) = drain(submit(srv.addr, req("/?boom=0"))?);
-
     assert_eq!(s1, 200);
-    assert!(b1.contains("ok counter=1"), "req1 baseline (got: {b1:?})");
+    assert!(b1.contains("ok counter=1"), "baseline (got: {b1:?})");
 
-    assert_eq!(
-        s2, 500,
-        "teardown-flush bailout commits a 500 head (got {s2}, body {b2:?})"
-    );
-    assert!(
-        b2.is_empty(),
-        "buffered body is lost to the bailout (got: {b2:?})"
-    );
+    for case in cases {
+        let resp = drain_resp(submit(srv.addr, req(case.query))?);
+        assert_eq!(
+            resp.status(),
+            case.status,
+            "{}: status (body {:?})",
+            case.name,
+            resp.body_string()
+        );
+        assert_eq!(resp.body_string(), case.body, "{}: body", case.name);
+        assert_eq!(resp.truncated, case.truncated, "{}: truncated", case.name);
 
-    assert_eq!(
-        s3, 200,
-        "worker must recover after a teardown bailout (got {s3})"
-    );
-    assert!(
-        b3.contains("ok counter=1"),
-        "recycle re-runs the bootstrap; statics reset (got: {b3:?})"
-    );
+        let (status, body) = drain(submit(srv.addr, req("/?boom=0"))?);
+        assert_eq!(
+            status, 200,
+            "{}: worker must recover after a teardown bailout",
+            case.name
+        );
+        assert!(
+            body.contains("ok counter=1"),
+            "{}: recycle re-runs the bootstrap; statics reset (got: {body:?})",
+            case.name
+        );
+    }
     Ok(())
 }
 

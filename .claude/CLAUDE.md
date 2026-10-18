@@ -24,7 +24,7 @@
 - Test behavior through simple results a client or operator sees: responses, log records, exit statuses or scoreboard lines. Assert on these results, not internal counters, queues or join handles.
 - Do not add public or private production API or branches only for tests. This includes functions, methods, constructors, accessors, `Default` implementations and feature flags. Do not add generics or traits with one production type and one test type. `#[cfg(test)]` and `pub(crate)` are not exceptions. Helpers inside `#[cfg(test)] mod tests` are test code.
 - If no external path reaches a behavior, test its pure logic in a unit test or leave it untested. Do not add test hooks. Delete tests of sequences that production never runs.
-- Unit tests belong in their crate's `#[cfg(test)] mod tests`. Test one small piece of code in its own scope. Private items are allowed. No fixtures: files, directories, sockets, child processes, signals, environment variables or PHP. Do not copy other rapira components as test doubles. In-memory inputs (futures, writers, wakers or paused tokio clocks) are not fixtures.
+- Unit tests belong in their crate's `#[cfg(test)] mod tests`. Test one small piece of code in its own scope. Private items are allowed. No fixtures: files, directories, sockets, child processes, signals, environment variables or PHP. Do not copy other rapira components as test doubles. In-memory inputs (futures, writers, wakers or paused tokio clocks) are not fixtures. An AF_UNIX socketpair counts as an in-memory input.
 - Put tests that need fixtures in `crates/tests/tests/e2e/` behind the `e2e` feature so workspace runs skip them. Use `Spawn` in `harness.rs` to run the real `rapira` binary. Use PHP fixtures instead of fake plugins or PHP. Delete fixture tests that cannot be replaced by e2e tests.
 - Reuse `crates/tests/src/`: `wire` (HTTP/1.1 client returning `Frame`s), `grpc` (gRPC, gRPC-Web and Connect clients), `server_log` (JSON log readers). Keep fixtures in `crates/tests/fixtures/` or `crates/tests/tests/e2e/fixtures/`. No `testing.rs`, `testdata/` or harness `[dev-dependencies]` in plugin crates. No tests in the root package's `tests/`.
 - Do not assert that a port refuses connections after a stop: another process can bind the free port.
@@ -62,3 +62,7 @@
 ## Design patterns
 
 - Follow [Rust idioms and design patterns](https://rust-unofficial.github.io/patterns/).
+
+## Reading before you implement
+
+- [Linux Kernel Internals](https://kernel-internals.org/): how the kernel subsystems work (memory, scheduling, I/O, networking). Read the relevant page before you implement something that touches a syscall, a socket, shared memory or a file descriptor.

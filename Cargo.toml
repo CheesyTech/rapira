@@ -30,7 +30,7 @@ members = [
     "crates/scoreboard",
     "crates/net",
     "crates/plugins/http",
-    "crates/plugins/grpc",
+    "crates/plugins/grpc"
 ]
 
 [workspace.dependencies]
