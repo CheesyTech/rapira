@@ -237,6 +237,7 @@ pub struct Context {
     pub body: Vec<u8>,
     pub stream: StreamState,
     pub tearing_down: bool,
+    pub errored: bool,
 }
 
 impl Context {
@@ -250,6 +251,7 @@ impl Context {
             body: Vec::new(),
             stream: StreamState::NotSent,
             tearing_down: false,
+            errored: false,
         }
     }
 
@@ -356,6 +358,7 @@ mod tests {
             body: Vec::new(),
             stream: StreamState::NotSent,
             tearing_down: false,
+            errored: false,
         };
         let headers = headers
             .iter()

@@ -37,10 +37,9 @@ fn classic_executor(ctx: &mut Context) -> (Event, bool) {
                 || (!core_globals.last_error_message.is_null()
                     && core_globals.last_error_type & E_FATAL_ERRORS as i32 != 0));
         ctx.tearing_down = true;
+        ctx.errored = exec_err;
         rapira_request_shutdown();
-
         let truncated = finalize_response(ctx, exec_err);
-
         (exec_err, truncated)
     };
 

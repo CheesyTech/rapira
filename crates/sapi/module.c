@@ -50,7 +50,8 @@ PHP_FUNCTION(rapira_finish_request) {
         RETURN_THROWS();
     }
     if (rapira_finish_output() != RAPIRA_OK) {
-        // re-raise: rapira_run_handler (worker mode) or php_execute_script (classic mode) catches it
+        // re-raise: rapira_run_handler (worker mode) or php_execute_script
+        // (classic mode) catches it
         zend_bailout();
     }
     rapira_rs_finish_response();
@@ -58,7 +59,8 @@ PHP_FUNCTION(rapira_finish_request) {
 }
 
 // ext/filter frees its cached raw input only in RSHUTDOWN (filter.c:190-196).
-// PECL imap frees its error and alert stacks only in RSHUTDOWN; without the reload a resident worker leaks and request N reads request N-1's errors.
+// PECL imap frees its error and alert stacks only in RSHUTDOWN; without the
+// reload a resident worker leaks and request N reads request N-1's errors.
 static const char *RELOAD_MODULES[] = {"filter", "imap", NULL};
 
 static void rapira_modules_request(bool startup) {
@@ -162,7 +164,8 @@ static void rapira_request_init(void) {
     }
 }
 
-// php_hash_environment re-arms CG(auto_globals) per request; the per-job path skips it.
+// php_hash_environment re-arms CG(auto_globals) per request; the per-job path
+// skips it.
 static void rapira_activate_auto_globals(void) {
     zend_auto_global *auto_global = NULL;
     zend_string *_env = ZSTR_KNOWN(ZEND_STR_AUTOGLOBAL_ENV);
@@ -339,6 +342,10 @@ int rapira_request_teardown(void) {
     zend_execute_data *observed_base = EG(current_observed_frame);
 
     RAPIRA_GUARD(php_output_end_all(), bailed, observed_base);
+    // the output is complete: publish the response before the module and SAPI
+    // teardown
+    RAPIRA_GUARD(php_header(), bailed, observed_base);
+    rapira_rs_finish_response();
     RAPIRA_GUARD(rapira_modules_request(false), bailed, observed_base);
     RAPIRA_GUARD(rapira_reset_session(), bailed, observed_base);
     RAPIRA_GUARD(php_output_deactivate(), bailed, observed_base);
@@ -356,9 +363,9 @@ int rapira_request_teardown(void) {
         zend_clear_exception();
     }
 
-    // unbind_server_context (context.rs) clears the other request_info pointers after each job.
-    // sapi_deactivate_module frees both without clearing them (main/SAPI.c);
-    // the cycle-end sapi_deactivate would free them again
+    // unbind_server_context (context.rs) clears the other request_info pointers
+    // after each job. sapi_deactivate_module frees both without clearing them
+    // (main/SAPI.c); the cycle-end sapi_deactivate would free them again
     SG(request_info).current_user = NULL;
     SG(request_info).content_type_dup = NULL;
 
@@ -395,7 +402,8 @@ void rapira_clear_last_error(void) {
 void rapira_process_init(void) { zend_signal_startup(); }
 
 // re-key the MM heap after fork; 8.5 asserts getpid() == heap->pid at shutdown.
-// php_execute_script keeps the current directory over a script run (main/main.c, SAPI_OPTION_NO_CHDIR)
+// php_execute_script keeps the current directory over a script run
+// (main/main.c, SAPI_OPTION_NO_CHDIR)
 void rapira_child_init(void) {
 #if PHP_VERSION_ID >= 80500
     refresh_memory_manager();

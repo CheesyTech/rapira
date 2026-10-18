@@ -3,7 +3,8 @@
 #include "rapira_arginfo.h"
 #include "rapira_exception_arginfo.h"
 
-// rust glue (src/values.rs): these return false with a PHP exception already pending
+// rust glue (src/values.rs): these return false with a PHP exception already
+// pending
 extern bool rapira_rs_ctor_inet_address(zend_object *obj, zend_string *ip,
                                         int64_t port);
 extern bool rapira_rs_ctor_unix_address(zend_object *obj, zend_string *path);
@@ -134,19 +135,26 @@ void rapira_register_classes(void) {
 // start.rs: runs each plugin register function, in the boot order
 extern void rapira_rs_register_plugin_classes(void);
 
-// the plugin classes extend the base classes, so the base classes register first
+// the plugin classes extend the base classes, so the base classes register
+// first
 PHP_MINIT_FUNCTION(rapira) {
     rapira_register_classes();
     rapira_rs_register_plugin_classes();
     return SUCCESS;
 }
 
+extern void rapira_rs_finish_response(void);
+
+// Runs after the shutdown functions
 PHP_RSHUTDOWN_FUNCTION(rapira) {
+    php_header();
+    rapira_rs_finish_response();
     rapira_rs_dispatcher_release();
     return SUCCESS;
 }
 
-// The module entry lives here: ext_functions is file-static in rapira_arginfo.h, and only this file includes it.
+// The module entry lives here: ext_functions is file-static in
+// rapira_arginfo.h, and only this file includes it.
 // clang-format off
 zend_module_entry rapira_module_entry = {
     STANDARD_MODULE_HEADER,

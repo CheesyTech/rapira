@@ -177,6 +177,7 @@ fn handle_request_impl(fci: *mut zend_fcall_info, fcc: *mut zend_fcall_info_cach
     } else {
         unsafe { rapira_finish_output() }
     };
+    ctx.errored = outcome != RAPIRA_OK as c_int || flushed == RAPIRA_BAILOUT as c_int;
     let teardown = unsafe { rapira_request_teardown() };
 
     let recycle: bool = [outcome, flushed, teardown].contains(&(RAPIRA_BAILOUT as c_int));
@@ -235,7 +236,8 @@ fn next_job() -> Option<Context> {
 pub extern "C" fn rapira_rs_finish_response() {
     guard((), || unsafe {
         if let Some(c) = ctx() {
-            c.finish(false);
+            let truncated = finalize_response(c, c.errored);
+            c.finish(truncated);
         }
     });
 }
