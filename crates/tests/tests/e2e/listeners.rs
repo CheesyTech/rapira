@@ -179,9 +179,13 @@ fn signals_during_the_boot_do_not_stop_the_master() {
     )
     .expect("write preload.php");
     let ini = tests::fixture("ini/shared/php.ini");
-    let ini = std::fs::read_to_string(&ini)
+    let mut ini = std::fs::read_to_string(&ini)
         .unwrap_or_else(|e| panic!("read {}: {e}", ini.display()))
         + &format!("\nopcache.preload = {}\n", preload.display());
+    // PHP needs opcache.preload_user under uid 0; `root` keeps the preload in the master process, where the signals must land: https://www.php.net/manual/en/opcache.configuration.php#ini.opcache.preload-user
+    if unsafe { libc::geteuid() } == 0 {
+        ini.push_str("opcache.preload_user = root\n");
+    }
 
     let mut srv = Spawn::http(Mode::Dispatcher, fixture_path(ECHO))
         .php_ini(&ini)
