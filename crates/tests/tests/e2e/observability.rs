@@ -224,7 +224,7 @@ fn a_booting_worker_is_starting_and_not_ready_until_its_first_pull() {
     assert_eq!((resp.status(), resp.body_string().as_str()), (200, "ok\n"));
 }
 
-/// A worker whose boot fails stays starting: the host's shed pull does not count as the worker's first pull. The 503 shows that the host shed the request in its shed pull. The slot stays starting through the re-boot and the next shed pull.
+/// A worker whose boot fails stays starting: the host's shed pull does not count as the app's first pull. The 503 shows that the host shed the request in its shed pull. The slot stays starting through the re-boot and the next shed pull.
 #[test]
 fn a_worker_whose_boot_fails_stays_starting() {
     let (srv, observability) = spawn(
@@ -267,7 +267,7 @@ fn a_pool_whose_boot_failed_turns_ready_without_a_request() {
         diagnostics(&srv)
     );
     std::fs::write(srv.dir.join("http/up.flag"), "").expect("write up.flag");
-    // No request goes to the http port, so only the worker itself can run the boot again.
+    // No request goes to the app port, so only the worker itself can run the boot again.
     let resp = poll(Duration::from_secs(15), || {
         let resp = get(observability, "/readyz");
         (resp.status() == 200).then_some(resp)
@@ -281,7 +281,7 @@ fn a_pool_whose_boot_failed_turns_ready_without_a_request() {
     assert_eq!(resp.body_string(), "ok\n");
 }
 
-/// A failed re-boot after the worker served shows starting, so the request watchdog skips the worker.
+/// A failed re-boot after the app served shows starting, so the request watchdog skips the worker.
 #[test]
 fn a_failed_reboot_stays_starting() {
     let (srv, observability) = spawn(

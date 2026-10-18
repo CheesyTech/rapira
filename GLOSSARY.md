@@ -9,8 +9,8 @@ The single parent process. It binds the listeners, forks the workers of every po
 _Avoid_: parent process, daemon, main process
 
 **Worker**:
-One forked process with one PHP interpreter, together with the PHP code it runs from the entrypoint: the counterpart of the host. It serves the units of one pool.
-_Avoid_: app, child, script, userland, PHP process; never a thread
+One forked process with one PHP interpreter. It serves the units of one pool.
+_Avoid_: child, PHP process; never the app code or a thread
 
 **Pool**:
 The worker set of one plugin, with its entrypoint, mode and process count.
@@ -31,25 +31,29 @@ _Avoid_: status table, stats, registry
 ## Sides of the boundary
 
 **Host**:
-The Rust side of the boundary: the master, and in a worker the plugin thread and the SAPI.
+The Rust side of the boundary: the master, and in a worker everything that is not the app.
 _Avoid_: runtime, engine, native side, SAPI (for the side as a whole)
+
+**App**:
+The PHP application code that a worker runs from the entrypoint.
+_Avoid_: worker (for code), script, userland, user code
 
 **Entrypoint**:
 The PHP file a pool runs.
 _Avoid_: bootstrap, script, index file
 
 **Mode**:
-The way the workers of a pool run the entrypoint: classic, worker or dispatcher.
+The way the workers of a pool run the app: classic, worker or dispatcher.
 _Avoid_: runtime mode, FPM mode
 
 **Classic mode**:
-The worker runs the entrypoint once per unit.
+The app runs the entrypoint once per unit.
 
 **Worker mode**:
-The worker runs the entrypoint once and serves units through a handler and the SAPI superglobals.
+The app runs the entrypoint once and serves units through a handler and the SAPI superglobals.
 
 **Dispatcher mode**:
-The worker runs the entrypoint once and receives units as objects from a dispatcher.
+The app runs the entrypoint once and receives units as objects from a dispatcher.
 
 **Plugin**:
 A protocol the host serves with its own pool, listener and dispatcher: http or grpc.
@@ -62,7 +66,7 @@ _Avoid_: filter, hook, guard, plugin (for a stage), the other protocol's word
 ## Units of work
 
 **Unit**:
-One piece of work the host hands to the worker: an exchange for http, a call for grpc. `Work` is its PHP interface.
+One piece of work the host hands to the app: an exchange for http, a call for grpc. `Work` is its PHP interface.
 _Avoid_: job, task, message, request (for the generic concept)
 
 **Exchange**:
@@ -74,15 +78,15 @@ The grpc unit: one invocation of one method, unary or streaming.
 _Avoid_: request, RPC (as a noun for the unit), exchange
 
 **Dispatcher**:
-The per-plugin object from which the worker receives units in dispatcher mode. One per process.
+The per-plugin object from which the app receives units in dispatcher mode. One per process.
 _Avoid_: queue, receiver, handler, server
 
 **Intake**:
-The bounded queue in a worker between the plugin thread and the PHP thread. Units wait here until the worker pulls them.
+The bounded queue of a worker between the plugin and the app. Units wait here until the app pulls them.
 _Avoid_: worker queue, job queue, mailbox, backlog (that is the kernel listen queue)
 
 **Pull**:
-The worker taking the next unit from the intake.
+The app taking the next unit from the intake.
 _Avoid_: poll, fetch, dequeue
 
 **Pending**:
@@ -97,7 +101,7 @@ One run of the entrypoint in a worker, from startup to shutdown. In classic mode
 _Avoid_: request (the PHP SAPI sense), run, iteration, session, the garbage collector's cycle
 
 **Boot**:
-The phase before serving. For the server: the master binds listeners and loads schemas before the fork. For a cycle: the run of the entrypoint before the worker's first pull. A fatal error in the boot is a boot failure; a fatal error after the first pull is a serving failure.
+The phase before serving. For the server: the master binds listeners and loads schemas before the fork. For a cycle: the run of the entrypoint before the app's first pull. A fatal error in the boot is a boot failure, not an app failure.
 _Avoid_: startup, bootstrap, warm-up, init
 
 **Shed**:
@@ -109,7 +113,7 @@ A unit whose result is no longer wanted: the client left, the deadline passed, o
 _Avoid_: aborted, gone, timed out (for the state)
 
 **Discarded**:
-A unit closed without an answer, by the host (drain, deadline, client gone) or by the worker.
+A unit closed without an answer, by the host (drain, deadline, client gone) or by the app.
 _Avoid_: dropped, aborted
 
 **Finalized**:
@@ -117,5 +121,5 @@ A unit with no further outcome possible: it was answered, discarded or cancelled
 _Avoid_: completed, done, closed, committed
 
 **Lost**:
-A unit the worker released without finalizing it. The host fails it.
+A unit the app released without finalizing it. The worker stays up, and the host fails the unit.
 _Avoid_: abandoned, leaked, dropped

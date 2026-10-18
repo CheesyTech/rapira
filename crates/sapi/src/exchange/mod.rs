@@ -44,7 +44,7 @@ thread_local! {
     /// The Box pointer of the unit handed out last, so paths where free_obj never runs (bailout) can still reclaim it.
     pub(crate) static UNIT: Cell<Option<*mut dyn Held>> = const { Cell::new(None) };
     pub(crate) static CLOSED_SEEN: Cell<bool> = const { Cell::new(false) };
-    /// A unit was handed out this cycle: a fatal after that is a serving failure, not a boot failure.
+    /// A unit was handed out this cycle: a fatal after that is an app failure, not a boot failure.
     pub(crate) static RECEIVED: Cell<bool> = const { Cell::new(false) };
 }
 

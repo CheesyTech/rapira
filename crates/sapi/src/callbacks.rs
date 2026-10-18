@@ -30,7 +30,7 @@ pub fn guard<T>(default: T, f: impl FnOnce() -> T) -> T {
 
 pub const MAX_BUFFERED_BODY: usize = 1 << 30;
 
-/// http_response_code is a worker-controlled c_int; clamping keeps the u16 cast from wrapping.
+/// http_response_code is an app-controlled c_int; clamping keeps the u16 cast from wrapping.
 fn head_status(h: &sapi_headers_struct) -> u16 {
     if h.http_response_code != 0 {
         h.http_response_code.clamp(100, 599) as u16
