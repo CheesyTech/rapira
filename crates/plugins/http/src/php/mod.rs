@@ -25,6 +25,7 @@ use rapira_sapi::{
 use tokio::sync::mpsc::{Sender, error::TrySendError};
 
 mod headers;
+mod info;
 mod request;
 mod respond;
 mod sendfile;
@@ -32,6 +33,7 @@ mod sendfile;
 mod tests;
 mod values;
 
+pub(crate) use info::set_server_identity;
 pub(crate) use sendfile::set_sendfile_root;
 
 // Class entries of the http stub; rapira_http_register_classes assigns them in MINIT (rapira_http.h).

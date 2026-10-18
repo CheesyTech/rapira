@@ -99,9 +99,14 @@ namespace Rapira\Http {
         ) {}
     }
 
-    /** The narrowing point where HTTP-specific counters land. */
+    /** The counters of the HTTP dispatcher and the server identity of the `http` section. */
     interface HttpDispatcherInfo extends \Rapira\DispatcherInfo
     {
+        /** The `server_name` of the `http` section. The default is `localhost`. */
+        public function serverName(): string;
+
+        /** The `server_port` of the `http` section. The default is the listen port, or 80 on a unix socket. */
+        public function serverPort(): int;
     }
 
     /** One request/response exchange: the request data plus the verbs that answer it. */
@@ -217,6 +222,10 @@ namespace Rapira\Internal\Http {
         public function pendingCount(): int {}
 
         public function activeCount(): int {}
+
+        public function serverName(): string {}
+
+        public function serverPort(): int {}
     }
 
     /**

@@ -64,6 +64,17 @@ ZEND_METHOD(Rapira_Internal_Http_DispatcherInfo, activeCount) {
     rapira_sapi_active_count(INTERNAL_FUNCTION_PARAM_PASSTHRU);
 }
 
+ZEND_METHOD(Rapira_Internal_Http_DispatcherInfo, serverName) {
+    ZEND_PARSE_PARAMETERS_NONE();
+    RAPIRA_RETURN_THROWS_UNLESS(rapira_rs_http_server_name(return_value),
+                                "serverName");
+}
+
+ZEND_METHOD(Rapira_Internal_Http_DispatcherInfo, serverPort) {
+    ZEND_PARSE_PARAMETERS_NONE();
+    RETURN_LONG(rapira_rs_http_server_port());
+}
+
 void rapira_http_register_classes(void) {
     rapira_ce_http_form_field = register_class_Rapira_Http_FormField();
     rapira_ce_http_uploaded_file = register_class_Rapira_Http_UploadedFile();
