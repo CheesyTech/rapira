@@ -351,7 +351,7 @@ fn client_abort_discards_the_unit() {
         .expect("send");
     let (status, _) = c.read_head(T).expect("flushed head");
     assert_eq!(status, 200);
-    c.abandon();
+    c.leave();
 
     assert!(
         wait_log_contains(&srv, "WorkDiscardedException", T),

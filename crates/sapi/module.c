@@ -97,31 +97,31 @@ static void rapira_observer_end_to(zend_execute_data *base) {
     EG(current_execute_data) = orig;
 }
 
-// Per-job budget; -1 = not captured. set_time_limit() rewrites the live field.
-static zend_long rapira_job_timeout = -1;
+// Per-unit budget; -1 = not captured. set_time_limit() rewrites the live field.
+static zend_long rapira_unit_timeout = -1;
 
 // zend_unset_timeout no-ops when EG(timeout_seconds) is 0, so disarm first.
 void rapira_receive_untimed(void) {
-    if (rapira_job_timeout < 0) {
-        rapira_job_timeout = EG(timeout_seconds);
+    if (rapira_unit_timeout < 0) {
+        rapira_unit_timeout = EG(timeout_seconds);
     }
     zend_unset_timeout();
     EG(timeout_seconds) = 0;
 }
 
 // zend_set_timeout re-assigns EG(timeout_seconds) itself (zend_execute_API.c).
-// receive() calls this without rapira_receive_untimed() when a job is queued:
+// receive() calls this without rapira_receive_untimed() when a unit is queued:
 // the capture is then still due, and zend_set_timeout(0) keeps a running timer.
 // Callers: receive() for each pulled unit, and rapira_request_init for each
-// worker job.
+// worker-mode unit.
 void rapira_receive_timed(void) {
-    if (rapira_job_timeout < 0) {
-        rapira_job_timeout = EG(timeout_seconds);
+    if (rapira_unit_timeout < 0) {
+        rapira_unit_timeout = EG(timeout_seconds);
     }
-    if (rapira_job_timeout == 0) {
+    if (rapira_unit_timeout == 0) {
         zend_unset_timeout();
     }
-    zend_set_timeout(rapira_job_timeout, false);
+    zend_set_timeout(rapira_unit_timeout, false);
 }
 
 // Per-request state php_request_startup() resets that the worker path skips.
@@ -131,10 +131,10 @@ static void rapira_request_init(void) {
     // a fatal can strand these set, breaking later URL opens and error logging
     PG(in_error_log) = false;
     PG(in_user_include) = false;
-    // init_compiler clears this per cycle (zend_compile.c:461), not per job
+    // init_compiler clears this per cycle (zend_compile.c:461), not per unit
     CG(unclean_shutdown) = false;
 
-    // arms the job budget as receive() does; reset_signals=0 there: the cycle's
+    // arms the unit budget as receive() does; reset_signals=0 there: the cycle's
     // php_request_startup installed the SIGPROF handler
     rapira_receive_timed();
 
@@ -164,7 +164,7 @@ static void rapira_request_init(void) {
     }
 }
 
-// php_hash_environment re-arms CG(auto_globals) per request; the per-job path
+// php_hash_environment re-arms CG(auto_globals) per request; the per-unit path
 // skips it.
 static void rapira_activate_auto_globals(void) {
     zend_auto_global *auto_global = NULL;
@@ -280,7 +280,7 @@ int rapira_run_handler(zend_fcall_info *fci, zend_fcall_info_cache *fcc) {
     }
     zend_end_try();
 
-    // No destructor sweep per job: it would run __destruct on live objects
+    // No destructor sweep per unit: it would run __destruct on live objects
     RAPIRA_OBSERVER_CLOSE(php_call_shutdown_functions(), observed_base);
     // freeing the table releases closure captures, which can run __destruct
     RAPIRA_OBSERVER_CLOSE(php_free_shutdown_functions(), observed_base);
@@ -320,7 +320,7 @@ int rapira_request_activate(void) {
     return outcome;
 }
 
-// sapi_activate resets the slot without releasing (SAPI.c), so it leaks per job
+// sapi_activate resets the slot without releasing (SAPI.c), so it leaks per unit
 static void rapira_release_header_callback(void) {
 #if PHP_VERSION_ID >= 80600
     if (ZEND_FCC_INITIALIZED(SG(send_header_fcc))) {
@@ -360,16 +360,16 @@ int rapira_request_teardown(void) {
     zend_try { zend_unset_timeout(); }
     zend_end_try();
 
-    // _zend_bailout leaves gc_protect engaged, disabling GC for the next job
+    // _zend_bailout leaves gc_protect engaged, disabling GC for the next unit
     gc_protect(false);
 
-    // teardown can run __destruct; a pending throw surfaces in the next job
+    // teardown can run __destruct; a pending throw surfaces in the next unit
     if (EG(exception)) {
         zend_clear_exception();
     }
 
     // unbind_server_context (context.rs) clears the other request_info pointers
-    // after each job. sapi_deactivate_module frees both without clearing them
+    // after each unit. sapi_deactivate_module frees both without clearing them
     // (main/SAPI.c); the cycle-end sapi_deactivate would free them again
     SG(request_info).current_user = NULL;
     SG(request_info).content_type_dup = NULL;
@@ -475,10 +475,10 @@ int rapira_request_shutdown(void) {
     // put the budget back armed: a stale 0 disables max_execution_time next
     // cycle, and the boot shutdown functions run under the timer until
     // php_request_shutdown disarms it (main/main.c:1993)
-    if (rapira_job_timeout >= 0) {
-        zend_set_timeout(rapira_job_timeout, false);
+    if (rapira_unit_timeout >= 0) {
+        zend_set_timeout(rapira_unit_timeout, false);
     }
-    rapira_job_timeout = -1; // cycle over: next cycle re-captures its budget
+    rapira_unit_timeout = -1; // cycle over: next cycle re-captures its budget
 #ifdef HAVE_PHP_SESSION
     // left set, it makes RSHUTDOWN skip the handler's close() (mod_user.c:29)
     PS(in_save_handler) = false;

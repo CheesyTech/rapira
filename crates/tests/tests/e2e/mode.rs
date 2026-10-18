@@ -4,14 +4,18 @@ use tests::{drain, drain_resp, fixture, req, server_log};
 
 use crate::harness::Spawn;
 
-/// The mode is fixed for the process: each job over the resident loop gets the same Worker case.
+/// The mode is fixed for the process: each unit over the resident loop gets the same Worker case.
 #[test]
-fn worker_mode_answers_worker_for_every_job() -> anyhow::Result<()> {
+fn worker_mode_answers_worker_for_every_unit() -> anyhow::Result<()> {
     let srv = Spawn::http(Mode::Worker, fixture("mode/worker.php")).spawn();
-    for job in 0..2 {
+    for unit in 0..2 {
         let resp = drain_resp(submit(srv.addr, req("/"))?);
-        assert_eq!(resp.status(), 200, "job {job}");
-        assert_eq!(resp.body_string(), "Worker:case:same:unbacked", "job {job}");
+        assert_eq!(resp.status(), 200, "unit {unit}");
+        assert_eq!(
+            resp.body_string(),
+            "Worker:case:same:unbacked",
+            "unit {unit}"
+        );
     }
     Ok(())
 }

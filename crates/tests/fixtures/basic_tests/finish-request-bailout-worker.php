@@ -10,7 +10,7 @@ $handler = static function (): void {
         });
         echo 'buffered';
         \rapira_finish_request();   // the flush runs the ob handler -> fatal
-        echo 'resumed-after-fatal'; // must never run: the bailout ends the job
+        echo 'resumed-after-fatal'; // must never run: the bailout ends the unit
         return;
     }
     header('Content-Type: text/plain');

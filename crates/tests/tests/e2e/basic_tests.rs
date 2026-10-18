@@ -315,7 +315,7 @@ fn scoreboard_counts_recycles_worker() -> anyhow::Result<()> {
     let snap = slot(&srv);
 
     assert_eq!(s2, 200, "worker recovers after the recycle");
-    assert_eq!(snap.handled, 2, "both jobs handled");
+    assert_eq!(snap.handled, 2, "both units handled");
     assert!(
         snap.recycles >= 1,
         "the shutdown-fn fatal must recycle the worker (recycles={})",
@@ -544,7 +544,7 @@ fn error_get_last_cleared_between_worker_requests() -> anyhow::Result<()> {
     let (_, b2) = drain(submit(srv.addr, req("/"))?);
     assert_eq!(
         b2, "clean",
-        "error_get_last() must reset between jobs (got {b2:?})"
+        "error_get_last() must reset between units (got {b2:?})"
     );
     Ok(())
 }
@@ -590,7 +590,7 @@ fn filter_raw_input_does_not_accumulate() -> anyhow::Result<()> {
     let leaked = m2 - m1;
     assert!(
         leaked < 32 * 1024,
-        "raw input copies must not accumulate across jobs; {leaked} bytes grown (~90KB pre-fix)"
+        "raw input copies must not accumulate across units; {leaked} bytes grown (~90KB pre-fix)"
     );
     Ok(())
 }

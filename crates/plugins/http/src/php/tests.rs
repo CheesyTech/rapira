@@ -94,8 +94,8 @@ fn overflow_seals_the_unit_truncated() {
 
     let v = unsafe { write_body_core(&mut st, c"y".as_ptr(), 1, true) };
     assert_eq!(v, Verb::Finalized);
-    let job: *const c_void = (&raw const st).cast();
-    assert!(unsafe { rapira_rs_exchange_is_finalized(job) });
+    let unit: *const c_void = (&raw const st).cast();
+    assert!(unsafe { rapira_rs_exchange_is_finalized(unit) });
 }
 
 /// A 304 head drops accepted body chunks at seal, like 204 and HEAD.
@@ -393,9 +393,9 @@ fn gone_client_discards_once_and_stays_discarded() {
     let v = unsafe { write_body_core(&mut st, c"y".as_ptr(), 1, true) };
     assert_eq!(v, Verb::Discarded, "sticky across repeat writes");
 
-    let job: *const c_void = (&raw const st).cast();
-    assert!(unsafe { rapira_rs_exchange_is_finalized(job) });
-    assert!(unsafe { rapira_rs_exchange_is_cancelled(job) });
+    let unit: *const c_void = (&raw const st).cast();
+    assert!(unsafe { rapira_rs_exchange_is_finalized(unit) });
+    assert!(unsafe { rapira_rs_exchange_is_cancelled(unit) });
 }
 
 /// `flush()` emits the implicit 200 once; a repeat flush puts nothing new on the stream.
@@ -403,8 +403,8 @@ fn gone_client_discards_once_and_stays_discarded() {
 fn flush_emits_the_implicit_head_once() {
     use rapira_sapi::types::Frame;
     let (mut st, mut rx) = state();
-    let job: *mut c_void = (&raw mut st).cast();
-    assert!(unsafe { rapira_rs_exchange_flush(job) });
+    let unit: *mut c_void = (&raw mut st).cast();
+    assert!(unsafe { rapira_rs_exchange_flush(unit) });
     let Ok(Frame::Head {
         head,
         content_length,
@@ -416,7 +416,7 @@ fn flush_emits_the_implicit_head_once() {
     assert_eq!(head.status, 200);
     assert!(head.headers.is_empty(), "implicit 200 has no fields");
     assert_eq!(content_length, None, "flush costs the computed length");
-    assert!(unsafe { rapira_rs_exchange_flush(job) });
+    assert!(unsafe { rapira_rs_exchange_flush(unit) });
     assert!(rx.try_recv().is_err(), "a repeat flush is a no-op");
 }
 

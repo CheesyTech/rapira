@@ -4,7 +4,7 @@ use crate::{
     callbacks::*,
     diagnostics::error_type_to_level,
     scoreboard::sb_update,
-    start::{Pulled, pull_job, pull_job_to_shed, run_script},
+    start::{Pulled, pull_unit, pull_unit_to_shed, run_script},
 };
 use std::{
     cell::Cell,
@@ -120,9 +120,9 @@ pub fn rapira_worker(script: PathBuf) -> WorkerExit {
                     sb_update(scoreboard::Event::Unhealthy);
                 }
                 sb_update(scoreboard::Event::BootFailed);
-                match pull_job_to_shed(BOOT_RETRY) {
+                match pull_unit_to_shed(BOOT_RETRY) {
                     Pulled::Closed => break WorkerExit::Closed,
-                    Pulled::Job(unit) => {
+                    Pulled::Unit(unit) => {
                         unit.shed();
                         sb_update(scoreboard::Event::Shed);
                     }
@@ -136,7 +136,7 @@ pub fn rapira_worker(script: PathBuf) -> WorkerExit {
 }
 
 /// # Safety
-/// Called from the C handle_request shell on the resident worker thread inside its active request, with valid `fci`/`fcc`. The unbind here is the only one per job. It also covers the caught-panic path, where SG(server_context) would otherwise point at a freed job.
+/// Called from the C handle_request shell on the resident worker thread inside its active request, with valid `fci`/`fcc`. The unbind here is the only one per unit. It also covers the caught-panic path, where SG(server_context) would otherwise point at a freed unit.
 #[unsafe(no_mangle)]
 pub extern "C" fn rapira_rs_handle_request(
     fci: *mut zend_fcall_info,
@@ -149,7 +149,7 @@ pub extern "C" fn rapira_rs_handle_request(
 
 /// Flushes before rapira_request_teardown: the real head (status, cookies, php_error_cb's 500) lives in SG(sapi_headers), which teardown destroys.
 fn handle_request_impl(fci: *mut zend_fcall_info, fcc: *mut zend_fcall_info_cache) -> u32 {
-    let Some(mut ctx) = next_job() else {
+    let Some(mut ctx) = next_unit() else {
         return if RECYCLE.get() {
             RAPIRA_HANDLE_RECYCLE
         } else {
@@ -197,20 +197,20 @@ fn handle_request_impl(fci: *mut zend_fcall_info, fcc: *mut zend_fcall_info_cach
     }
 }
 
-/// The first call tears down the bootstrap request php_request_startup() left behind, before any job is served.
-fn next_job() -> Option<Context> {
+/// The first call tears down the bootstrap request php_request_startup() left behind, before any unit is served.
+fn next_unit() -> Option<Context> {
     if FIRST_CALL.take() {
         if unsafe { rapira_request_teardown() } == RAPIRA_BAILOUT as c_int {
             error!(target: "rapira", "rapira_request_teardown() bailed on first call; recycling");
             RECYCLE.set(true);
             return None;
         }
-        // hide boot registrations from the per-job shutdown pass; they run at cycle end
+        // hide boot registrations from the per-unit shutdown pass; they run at cycle end
         unsafe { rapira_stash_boot_shutdown_functions() };
     }
     log_and_clear_last_error();
     loop {
-        match pull_job() {
+        match pull_unit() {
             Some(unit) => {
                 if unit.cancelled() {
                     sb_update(scoreboard::Event::Handled(true));

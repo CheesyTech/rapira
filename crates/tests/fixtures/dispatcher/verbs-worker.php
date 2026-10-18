@@ -149,11 +149,11 @@ try {
             $ex->writeBody(sprintf('pending=%d active=%d', $info->pendingCount(), $info->activeCount()));
             continue;
         }
-        if ($probe === 'abandon') {
+        if ($probe === 'lose') {
             unset($ex); // never finalized: the plugin must fail this unit and keep serving
             continue;
         }
-        if ($probe === 'abandon-mid') {
+        if ($probe === 'lose-mid') {
             $ex->writeHead(200);
             $ex->writeBody('partial', eos: false);
             unset($ex); // head already on the wire: the plugin can only truncate

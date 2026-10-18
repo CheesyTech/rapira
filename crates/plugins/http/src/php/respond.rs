@@ -168,10 +168,10 @@ pub(super) unsafe fn write_trailers_core(st: &mut ExchangeState, trailers: Heade
 }
 
 /// # Safety
-/// `job` from receive; `trailers` a live, ZPP-owned array; engine active.
+/// `unit` from receive; `trailers` a live, ZPP-owned array; engine active.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rapira_rs_exchange_write_trailers(
-    job: *mut c_void,
+    unit: *mut c_void,
     trailers: *mut HashTable,
 ) -> bool {
     guard(false, || unsafe {
@@ -191,7 +191,7 @@ pub unsafe extern "C" fn rapira_rs_exchange_write_trailers(
             );
             return false;
         }
-        let st = &mut *job.cast::<ExchangeState>();
+        let st = &mut *unit.cast::<ExchangeState>();
         throw_verb(write_trailers_core(st, map))
     })
 }
@@ -238,15 +238,15 @@ pub(super) unsafe fn write_head_core(
 }
 
 /// # Safety
-/// `job` from receive; `headers` NULL or a live, ZPP-owned array.
+/// `unit` from receive; `headers` NULL or a live, ZPP-owned array.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rapira_rs_exchange_write_head(
-    job: *mut c_void,
+    unit: *mut c_void,
     status: i64,
     headers: *mut HashTable,
 ) -> bool {
     guard(false, || unsafe {
-        let st = &mut *job.cast::<ExchangeState>();
+        let st = &mut *unit.cast::<ExchangeState>();
         if !(100..=599).contains(&status) {
             rapira_sapi::zend_value_error(
                 c"status must be between 100 and 599, %lld given".as_ptr(),
@@ -345,16 +345,16 @@ pub(super) unsafe fn send_body(
 }
 
 /// # Safety
-/// `job` from receive; `p` points at `len` readable bytes.
+/// `unit` from receive; `p` points at `len` readable bytes.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rapira_rs_exchange_write_body(
-    job: *mut c_void,
+    unit: *mut c_void,
     p: *const c_char,
     len: usize,
     eos: bool,
 ) -> bool {
     guard(false, || unsafe {
-        let st = &mut *job.cast::<ExchangeState>();
+        let st = &mut *unit.cast::<ExchangeState>();
         throw_verb(write_body_core(st, p, len, eos))
     })
 }
@@ -378,11 +378,11 @@ pub(super) unsafe fn seal(st: &mut ExchangeState, truncated: bool, trailers: Hea
 }
 
 /// # Safety
-/// `job` from receive; engine active on this thread.
+/// `unit` from receive; engine active on this thread.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rapira_rs_exchange_flush(job: *mut c_void) -> bool {
+pub unsafe extern "C" fn rapira_rs_exchange_flush(unit: *mut c_void) -> bool {
     guard(false, || unsafe {
-        let st = &mut *job.cast::<ExchangeState>();
+        let st = &mut *unit.cast::<ExchangeState>();
         let v = if st.client_closed() {
             discard_unit(st);
             Verb::Discarded
@@ -402,31 +402,31 @@ pub unsafe extern "C" fn rapira_rs_exchange_flush(job: *mut c_void) -> bool {
 }
 
 /// # Safety
-/// `job` from receive.
+/// `unit` from receive.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rapira_rs_exchange_is_finalized(job: *const c_void) -> bool {
+pub unsafe extern "C" fn rapira_rs_exchange_is_finalized(unit: *const c_void) -> bool {
     guard(false, || unsafe {
-        (*job.cast::<ExchangeState>()).is_finalized()
+        (*unit.cast::<ExchangeState>()).is_finalized()
     })
 }
 
 /// # Safety
-/// `job` from receive.
+/// `unit` from receive.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rapira_rs_exchange_is_cancelled(job: *const c_void) -> bool {
+pub unsafe extern "C" fn rapira_rs_exchange_is_cancelled(unit: *const c_void) -> bool {
     guard(false, || unsafe {
-        let st = &*job.cast::<ExchangeState>();
+        let st = &*unit.cast::<ExchangeState>();
         st.client_closed()
     })
 }
 
 /// Reclaims the Box on free_obj; a unit lost to a bailout (fatal, timeout) skips the failure frames, so the plugin reports the worker death when the sender drops.
 /// # Safety
-/// `job` is a non-null pointer produced by `Box::into_raw` in receive; free_obj checks for NULL before the call.
+/// `unit` is a non-null pointer produced by `Box::into_raw` in receive; free_obj checks for NULL before the call.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rapira_rs_exchange_drop(job: *mut c_void) {
+pub unsafe extern "C" fn rapira_rs_exchange_drop(unit: *mut c_void) {
     guard((), || {
-        let mut st = unsafe { release(job.cast::<ExchangeState>()) };
+        let mut st = unsafe { release(unit.cast::<ExchangeState>()) };
         let cycle_died = unsafe { rapira_sapi::compiler_globals.unclean_shutdown };
         if st.stage != Stage::Finalized && !cycle_died {
             st.body.unlink_spools();

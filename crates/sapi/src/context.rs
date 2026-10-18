@@ -57,7 +57,7 @@ pub(crate) fn bind_server_context(ctx: &mut Context) {
     }
 }
 
-/// Clears SG(server_context) and the SG(request_info) pointers into the job.
+/// Clears SG(server_context) and the SG(request_info) pointers into the unit.
 pub(crate) fn unbind_server_context() {
     unsafe {
         let sg = &raw mut sapi_globals;

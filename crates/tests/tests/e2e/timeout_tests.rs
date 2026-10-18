@@ -62,9 +62,9 @@ fn rearmed_budget_kills_a_spinning_unit() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Pins that the per-job re-arm with reset_signals=0 still delivers SIGRTMIN: a spin on a later job in the same cycle is killed, not left running.
+/// Pins that the per-unit re-arm with reset_signals=0 still delivers SIGRTMIN: a spin on a later unit in the same cycle is killed, not left running.
 #[test]
-fn max_execution_time_fires_on_rearmed_jobs() -> anyhow::Result<()> {
+fn max_execution_time_fires_on_rearmed_units() -> anyhow::Result<()> {
     let srv = Spawn::http(Mode::Worker, fixture("timeout_tests/timeout-worker.php"))
         .php_ini(&timeout_ini())
         .spawn();
@@ -75,7 +75,7 @@ fn max_execution_time_fires_on_rearmed_jobs() -> anyhow::Result<()> {
     let mut rx = submit(srv.addr, req("/timeout-worker.php?mode=spin"))?;
     let deadline = Instant::now() + Duration::from_secs(10);
     let resp = drain_resp_deadline(&mut rx, deadline)
-        .expect("spinning job was never killed - max_execution_time did not fire");
+        .expect("spinning unit was never killed - max_execution_time did not fire");
     assert!(resp.ended, "worker died without sealing a response");
     let body = resp.body_string();
     assert!(

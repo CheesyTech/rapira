@@ -86,10 +86,10 @@ pub(super) unsafe fn send_file_core(
 }
 
 /// # Safety
-/// `job` from receive; `path` points at `path_len` readable bytes (ZPP-owned); engine active on this thread.
+/// `unit` from receive; `path` points at `path_len` readable bytes (ZPP-owned); engine active on this thread.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rapira_rs_exchange_send_file(
-    job: *mut c_void,
+    unit: *mut c_void,
     path: *const c_char,
     path_len: usize,
     offset: i64,
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn rapira_rs_exchange_send_file(
             );
             return false;
         }
-        let st = &mut *job.cast::<ExchangeState>();
+        let st = &mut *unit.cast::<ExchangeState>();
         let path = std::slice::from_raw_parts(path.cast::<u8>(), path_len);
         let length = (!length_is_null).then_some(length as u64);
         throw_verb(send_file_core(st, path, offset as u64, length, eos))

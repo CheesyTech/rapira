@@ -9,9 +9,9 @@ use tests::{drain, drain_resp, drain_resp_deadline, fixture, req, server_log};
 
 use crate::harness::{Spawn, slot_line};
 
-/// Superglobals are rebuilt per job over the resident loop: query state must not leak.
+/// Superglobals are rebuilt per unit over the resident loop: query state must not leak.
 #[test]
-fn worker_serves_with_per_job_superglobals() -> anyhow::Result<()> {
+fn worker_serves_with_per_unit_superglobals() -> anyhow::Result<()> {
     let srv = Spawn::http(Mode::Worker, fixture("worker/hello-worker.php")).spawn();
 
     let resp = drain_resp(submit(srv.addr, req("/?q=zap"))?);
@@ -109,7 +109,7 @@ fn exit_in_a_handler_survives_the_worker() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// A self-stopping loop classifies Recycle: the next job re-bootstraps and is still served.
+/// A self-stopping loop classifies Recycle: the next unit re-bootstraps and is still served.
 #[test]
 fn self_stopping_loop_recycles_and_serves_again() -> anyhow::Result<()> {
     let mut srv = Spawn::http(Mode::Worker, fixture("worker/one-turn-worker.php"))
@@ -142,9 +142,9 @@ fn never_looping_script_sheds_503() -> anyhow::Result<()> {
 #[test]
 fn bootstrap_env_survives_late_compilation() -> anyhow::Result<()> {
     let srv = Spawn::http(Mode::Worker, fixture("worker/env-worker.php")).spawn();
-    for job in 0..2 {
+    for unit in 0..2 {
         let resp = drain_resp(submit(srv.addr, req("/"))?);
-        assert_eq!(resp.body_string(), "set-at-boot", "job {job}");
+        assert_eq!(resp.body_string(), "set-at-boot", "unit {unit}");
     }
     Ok(())
 }
@@ -202,7 +202,7 @@ fn queued_client_gone_is_discarded_before_handout() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// handle_request() from inside its own handler is refused: no deadlock, and the outer job completes.
+/// handle_request() from inside its own handler is refused: no deadlock, and the outer unit completes.
 #[test]
 fn nested_handle_request_is_refused() -> anyhow::Result<()> {
     let srv = Spawn::http(Mode::Worker, fixture("worker/nested-worker.php")).spawn();

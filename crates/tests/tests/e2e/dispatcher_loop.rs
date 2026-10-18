@@ -281,10 +281,10 @@ fn receive_while_unfinalized_throws() -> anyhow::Result<()> {
 
 /// An Exchange dropped without finalizing fails that unit only: the plugin answers 500 and the worker serves the next unit.
 #[test]
-fn abandoned_exchange_fails_that_unit_only() -> anyhow::Result<()> {
+fn lost_exchange_fails_that_unit_only() -> anyhow::Result<()> {
     let srv = Spawn::http(Mode::Dispatcher, fixture("dispatcher/verbs-worker.php")).spawn();
 
-    let resp = drain_resp(submit(srv.addr, req("/?probe=abandon"))?);
+    let resp = drain_resp(submit(srv.addr, req("/?probe=lose"))?);
     assert_eq!(
         (
             resp.status(),
@@ -293,19 +293,19 @@ fn abandoned_exchange_fails_that_unit_only() -> anyhow::Result<()> {
             resp.ended
         ),
         (500, &b""[..], false, true),
-        "an abandoned unit is failed by the plugin with a complete 500"
+        "a lost unit is failed by the plugin with a complete 500"
     );
 
     let (status, body) = drain(submit(srv.addr, req("/"))?);
     assert_eq!(
         (status, body.as_str()),
         (200, "state=false"),
-        "the worker must keep serving after an abandoned unit"
+        "the worker must keep serving after a lost unit"
     );
     Ok(())
 }
 
-/// A unit that dies with the cycle is a worker death, not an abandonment: the reply closes with no head, so the plugin answers 502, not the 500 of an abandoned unit.
+/// A unit that dies with the cycle is a worker death, not a loss: the reply closes with no head, so the plugin answers 502, not the 500 of a lost unit.
 #[test]
 fn bailout_with_unit_out_dies_unsent() -> anyhow::Result<()> {
     let srv = Spawn::http(Mode::Dispatcher, fixture("dispatcher/verbs-worker.php")).spawn();
@@ -326,12 +326,12 @@ fn bailout_with_unit_out_dies_unsent() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// An Exchange abandoned after the head reached the wire cannot become a 500: the plugin ends the stream truncated so the client detects it.
+/// An Exchange lost after the head reached the wire cannot become a 500: the plugin ends the stream truncated so the client detects it.
 #[test]
-fn abandoned_mid_stream_exchange_truncates() -> anyhow::Result<()> {
+fn lost_mid_stream_exchange_truncates() -> anyhow::Result<()> {
     let srv = Spawn::http(Mode::Dispatcher, fixture("dispatcher/verbs-worker.php")).spawn();
 
-    let resp = drain_resp(submit(srv.addr, req("/?probe=abandon-mid"))?);
+    let resp = drain_resp(submit(srv.addr, req("/?probe=lose-mid"))?);
     assert_eq!(resp.status(), 200, "the committed head stands");
     assert_eq!(resp.body, b"partial");
     assert!(resp.truncated, "the cut must be visible to the client");
@@ -389,13 +389,13 @@ fn spooled_files(srv: &Server) -> Vec<PathBuf> {
     .unwrap_or_else(read)
 }
 
-/// An abandoned unit holding a plugin-parsed multipart body must unlink its spool the moment the exchange dies.
+/// A lost unit holding a plugin-parsed multipart body must unlink its spool the moment the exchange dies.
 #[test]
-fn abandoned_multipart_unit_unlinks_its_spool() -> anyhow::Result<()> {
+fn lost_multipart_unit_unlinks_its_spool() -> anyhow::Result<()> {
     let srv = uploads_server("dispatcher/verbs-worker.php");
 
     let rq = multipart(
-        "/?probe=abandon",
+        "/?probe=lose",
         &[(
             "content-disposition: form-data; name=\"f\"; filename=\"a.bin\"",
             "PAYLOAD",
