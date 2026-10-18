@@ -1,6 +1,7 @@
 PHP_CONFIG ?= php-config
-LOCATE_PHP = PREFIX=$$($(PHP_CONFIG) --prefix 2>/dev/null); test -n "$$PREFIX" || { echo "$(PHP_CONFIG) not found; set PHP_CONFIG=/path/to/php-config"; exit 1; }; LIBPHP=$$(find "$$PREFIX/lib64" "$$PREFIX/lib" "$$PREFIX"/lib/php* -maxdepth 1 \( -name 'libphp*.so' -o -name 'libphp*.dylib' \) 2>/dev/null | head -1); test -n "$$LIBPHP" || { echo "no libphp*.so/.dylib under $$PREFIX; install your distro's PHP embed package or build PHP with --enable-embed=shared"; exit 1; }; LIBDIR=$$(dirname "$$LIBPHP"); mkdir -p target/phplib || exit 1; case "$$LIBPHP" in *.dylib) ln -sf "$$LIBPHP" target/phplib/libphp.dylib || exit 1;; *) ln -sf "$$LIBPHP" target/phplib/libphp.so || exit 1;; esac; PHPLIB="$$PWD/target/phplib"
-PHP_ENV = PHP_CONFIG=$(PHP_CONFIG) LD_LIBRARY_PATH="$$PHPLIB:$$LIBDIR" DYLD_LIBRARY_PATH="$$PHPLIB:$$LIBDIR" RUSTFLAGS="-L native=$$PHPLIB"
+# php-embedded puts libphp.so on the default linker path; a custom prefix (make php) needs LD_LIBRARY_PATH.
+LOCATE_PHP = PREFIX=$$($(PHP_CONFIG) --prefix 2>/dev/null); test -n "$$PREFIX" || { echo "$(PHP_CONFIG) not found; set PHP_CONFIG=/path/to/php-config"; exit 1; }; LIBPHP=$$(find "$$PREFIX/lib64" "$$PREFIX/lib" -maxdepth 1 -name libphp.so 2>/dev/null | head -1); test -n "$$LIBPHP" || { echo "no libphp.so under $$PREFIX; install php-embedded or build PHP with --enable-embed=shared"; exit 1; }; LIBDIR=$$(dirname "$$LIBPHP")
+PHP_ENV = PHP_CONFIG=$(PHP_CONFIG) LD_LIBRARY_PATH="$$LIBDIR"
 
 GEN_STUB ?= $(shell $(PHP_CONFIG) --prefix)/lib64/php/build/gen_stub.php
 PHP_BIN ?= $(shell $(PHP_CONFIG) --prefix)/bin/php
@@ -45,10 +46,6 @@ php:
 	@test -d "$(PHP_SRC)" || { echo "php-src not found at $(PHP_SRC); set PHP_SRC=/path/to/php-src"; exit 1; }
 	-@$(MAKE) -C "$(PHP_SRC)" distclean >/dev/null 2>&1
 	@FLAGS="$$(tr '\n' ' ' < .github/php-configure-flags.txt)"; \
-	if [ "$$(uname)" = Darwin ]; then \
-		export PKG_CONFIG_PATH="$$(brew --prefix openssl@3)/lib/pkgconfig:$$(brew --prefix curl)/lib/pkgconfig:$$(brew --prefix oniguruma)/lib/pkgconfig:$$(brew --prefix libxml2)/lib/pkgconfig:$$(brew --prefix sqlite)/lib/pkgconfig:$$(brew --prefix libffi)/lib/pkgconfig:$$(brew --prefix icu4c)/lib/pkgconfig:$$(brew --prefix libpq)/lib/pkgconfig$${PKG_CONFIG_PATH:+:$$PKG_CONFIG_PATH}"; \
-		FLAGS="$$FLAGS --with-iconv=$$(xcrun --show-sdk-path)/usr --with-gettext=$$(brew --prefix gettext)"; \
-	fi; \
 	cd "$(PHP_SRC)" && \
 	./buildconf --force && \
 	./configure --prefix="$(PHP_PREFIX)" $$FLAGS
