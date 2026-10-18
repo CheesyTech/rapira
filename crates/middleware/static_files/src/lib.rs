@@ -42,7 +42,7 @@ impl StaticFiles {
             entry.make_ascii_lowercase();
         }
         Self {
-            // The URL space belongs to PHP: a directory URL is the app's route, not an
+            // The URL space belongs to PHP: a directory URL is a PHP route, not an
             // implicit index.html.
             dir: ServeDir::with_backend(root, CachingBackend::default())
                 .append_index_html_on_directories(false),

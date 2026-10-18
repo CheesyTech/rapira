@@ -18,7 +18,7 @@ pub enum Event {
     Idle,
     Active,
     Draining,
-    /// A boot cycle ended without a pull of the app. The slot shows STARTING until the app pulls. After the drain decision, the slot shows DRAINING.
+    /// A boot cycle ended without a pull by the worker. The slot shows STARTING until the worker pulls. After the drain decision, the slot shows DRAINING.
     BootFailed,
 }
 
