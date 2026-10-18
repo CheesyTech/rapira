@@ -236,7 +236,9 @@ fn next_job() -> Option<Context> {
 pub extern "C" fn rapira_rs_finish_response() {
     guard((), || unsafe {
         if let Some(c) = ctx() {
-            let truncated = finalize_response(c, c.errored);
+            // CG(unclean_shutdown) covers a bailout of the teardown flush, which runs after ctx.errored is set
+            let errored = c.errored || compiler_globals.unclean_shutdown;
+            let truncated = finalize_response(c, errored);
             c.finish(truncated);
         }
     });

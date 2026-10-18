@@ -341,10 +341,15 @@ int rapira_request_teardown(void) {
     // the VM stack is popped when handle_request returns, so close frames here
     zend_execute_data *observed_base = EG(current_observed_frame);
 
-    RAPIRA_GUARD(php_output_end_all(), bailed, observed_base);
     // the output is complete: publish the response before the module and SAPI
-    // teardown
-    RAPIRA_GUARD(php_header(), bailed, observed_base);
+    // teardown. One try for both: after a flush bailout the head stays unsent,
+    // and the seal commits the 500 head.
+    RAPIRA_GUARD(
+        {
+            php_output_end_all();
+            php_header();
+        },
+        bailed, observed_base);
     rapira_rs_finish_response();
     RAPIRA_GUARD(rapira_modules_request(false), bailed, observed_base);
     RAPIRA_GUARD(rapira_reset_session(), bailed, observed_base);
