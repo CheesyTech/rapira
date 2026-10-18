@@ -83,6 +83,7 @@ impl Plugin for Server {
             return Err(anyhow!("http listener was not prepared"));
         };
         php::set_sendfile_root(config.sendfile_root.clone());
+        php::set_server_identity(config.server_name.clone(), config.server_port);
         serve::serve(worker.sink.clone(), config, prepared, worker)
     }
 }

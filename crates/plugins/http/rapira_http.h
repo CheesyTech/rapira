@@ -5,6 +5,8 @@
 
 // rust glue
 extern void rapira_rs_exchange_drop(void *unit);
+extern bool rapira_rs_http_server_name(zval *return_value);
+extern zend_long rapira_rs_http_server_port(void);
 
 // C data sits before zend_object std, as in rapira_sapi.h
 typedef struct {

@@ -925,6 +925,47 @@ fn get_info_counts_the_outstanding_unit() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// `getInfo()` reports the `server_name` and `server_port` of the `http` section: the configured values, else `localhost` and the listen port.
+#[test]
+fn get_info_reports_the_server_identity() -> anyhow::Result<()> {
+    struct Case {
+        name: &'static str,
+        http_extra: &'static str,
+        want_name: &'static str,
+        /// `None`: the listen port.
+        want_port: Option<u16>,
+    }
+    let cases = [
+        Case {
+            name: "defaults",
+            http_extra: "",
+            want_name: "localhost",
+            want_port: None,
+        },
+        Case {
+            name: "configured",
+            http_extra: "server_name = \"app.example\"\nserver_port = 8443",
+            want_name: "app.example",
+            want_port: Some(8443),
+        },
+    ];
+
+    for case in cases {
+        let srv = Spawn::http(Mode::Dispatcher, fixture("dispatcher/verbs-worker.php"))
+            .http_extra(case.http_extra)
+            .spawn();
+        let want_port = case.want_port.unwrap_or(srv.addr.port());
+        let (status, body) = drain(submit(srv.addr, req("/?probe=server"))?);
+        assert_eq!(
+            (status, body),
+            (200, format!("name={} port={want_port}", case.want_name)),
+            "{}",
+            case.name
+        );
+    }
+    Ok(())
+}
+
 // ---- streaming (stream-worker.php): the frame protocol past the buffered one-shot
 
 /// A dispatcher pool over stream-worker.php with a JSON log, and the frames of one request to `query`.

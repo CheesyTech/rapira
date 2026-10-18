@@ -149,6 +149,11 @@ try {
             $ex->writeBody(sprintf('pending=%d active=%d', $info->pendingCount(), $info->activeCount()));
             continue;
         }
+        if ($probe === 'server') {
+            $info = $d->getInfo();
+            $ex->writeBody(sprintf('name=%s port=%d', $info->serverName(), $info->serverPort()));
+            continue;
+        }
         if ($probe === 'lose') {
             unset($ex); // never finalized: the plugin must fail this unit and keep serving
             continue;
