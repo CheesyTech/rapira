@@ -2,8 +2,7 @@ PHP_CONFIG ?= php-config
 LOCATE_PHP = PREFIX=$$($(PHP_CONFIG) --prefix 2>/dev/null); test -n "$$PREFIX" || { echo "$(PHP_CONFIG) not found; set PHP_CONFIG=/path/to/php-config"; exit 1; }; LIBPHP=$$(find "$$PREFIX/lib64" "$$PREFIX/lib" "$$PREFIX"/lib/php* -maxdepth 1 \( -name 'libphp*.so' -o -name 'libphp*.dylib' \) 2>/dev/null | head -1); test -n "$$LIBPHP" || { echo "no libphp*.so/.dylib under $$PREFIX; install your distro's PHP embed package or build PHP with --enable-embed=shared"; exit 1; }; LIBDIR=$$(dirname "$$LIBPHP"); mkdir -p target/phplib || exit 1; case "$$LIBPHP" in *.dylib) ln -sf "$$LIBPHP" target/phplib/libphp.dylib || exit 1;; *) ln -sf "$$LIBPHP" target/phplib/libphp.so || exit 1;; esac; PHPLIB="$$PWD/target/phplib"
 PHP_ENV = PHP_CONFIG=$(PHP_CONFIG) LD_LIBRARY_PATH="$$PHPLIB:$$LIBDIR" DYLD_LIBRARY_PATH="$$PHPLIB:$$LIBDIR" RUSTFLAGS="-L native=$$PHPLIB"
 
-# lib64 on Fedora and RHEL, lib elsewhere
-GEN_STUB ?= $(firstword $(wildcard $(shell $(PHP_CONFIG) --prefix)/lib64/php/build/gen_stub.php) $(shell $(PHP_CONFIG) --prefix)/lib/php/build/gen_stub.php)
+GEN_STUB ?= $(shell $(PHP_CONFIG) --prefix)/lib64/php/build/gen_stub.php
 PHP_BIN ?= $(shell $(PHP_CONFIG) --prefix)/bin/php
 
 BUF_VERSION ?= v1.73.0
