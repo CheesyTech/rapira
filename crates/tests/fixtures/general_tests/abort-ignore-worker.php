@@ -6,7 +6,8 @@ class TrackIgnore
 $handler = static function (): void {
 	header('Content-Type: text/plain');
 	if (($_GET['probe'] ?? '') === '1') {
-		echo "reached=", TrackIgnore::$reached, " aborted=", connection_aborted();
+		// (int): php-src master returns bool, PHP 8 returns int. https://github.com/php/php-src/commit/8639e7522a33309b1ed9d096c4a90204e2e50d1a
+		echo "reached=", TrackIgnore::$reached, " aborted=", (int) connection_aborted();
 		return;
 	}
 	ignore_user_abort(true);
