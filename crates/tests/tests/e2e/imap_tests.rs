@@ -43,7 +43,7 @@ fn imap_timeout_is_snapshotted_at_minit() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// The per-job RSHUTDOWN reports each undrained entry as an E_NOTICE through the SAPI log_message hook; the log is read after the stop, so it holds every record of the worker.
+/// The per-unit RSHUTDOWN reports each undrained entry as an E_NOTICE through the SAPI log_message hook; the log is read after the stop, so it holds every record of the worker.
 #[test]
 fn imap_undrained_error_reaches_the_log() -> anyhow::Result<()> {
     let name = "imap_tests/imap-errors-worker.php";

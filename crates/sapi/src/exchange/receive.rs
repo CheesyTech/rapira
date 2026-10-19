@@ -26,7 +26,7 @@ unsafe fn receive_into(return_value: *mut zval, mode: RecvMode) -> bool {
         }
         let mut obj: zval = std::mem::zeroed();
         let _ = object_init_ex(&mut obj, (classes.unit)());
-        // The timer of the previous job still runs. A queued job re-arms it, so disarm it only before a wait.
+        // The timer of the previous unit still runs. A queued unit re-arms it, so disarm it only before a wait.
         let mut armed = matches!(mode, RecvMode::Wait(t) if t != 0);
         if !armed {
             // SAFETY: plain zend timer bookkeeping on this thread; no bailout path.
@@ -34,13 +34,13 @@ unsafe fn receive_into(return_value: *mut zval, mode: RecvMode) -> bool {
         }
         loop {
             let pulled = match mode {
-                RecvMode::Wait(_) if armed => pull_job_try(),
-                RecvMode::Try | RecvMode::Wait(0) => pull_job_try(),
-                RecvMode::Wait(-1) => pull_job_wait(None),
-                RecvMode::Wait(t) => pull_job_wait(Some(Duration::from_micros(t as u64))),
+                RecvMode::Wait(_) if armed => pull_unit_try(),
+                RecvMode::Try | RecvMode::Wait(0) => pull_unit_try(),
+                RecvMode::Wait(-1) => pull_unit_wait(None),
+                RecvMode::Wait(t) => pull_unit_wait(Some(Duration::from_micros(t as u64))),
             };
             match pulled {
-                Pulled::Job(unit) => {
+                Pulled::Unit(unit) => {
                     if unit.cancelled() {
                         sb_update(Event::Handled(true));
                         continue;

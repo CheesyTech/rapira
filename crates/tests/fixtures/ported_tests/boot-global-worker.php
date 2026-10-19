@@ -1,5 +1,5 @@
 <?php
-// A refcount-1 object in a bare boot global stays in the symbol table across jobs. Its destructor runs once, at cycle end.
+// A refcount-1 object in a bare boot global stays in the symbol table across units. Its destructor runs once, at cycle end.
 class Kernel
 {
     public int $calls = 0;

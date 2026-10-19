@@ -36,7 +36,7 @@ impl Work for Exchange {
         let tx = sender.expect("a queued exchange holds its sender");
         let ptr = Box::into_raw(Box::new(ExchangeState::new(req, tx)));
         // SAFETY: the caller passes a live Rapira\Internal\Http\Exchange object.
-        unsafe { (*exchange_from(obj)).job = ptr.cast() };
+        unsafe { (*exchange_from(obj)).unit = ptr.cast() };
         ptr
     }
 

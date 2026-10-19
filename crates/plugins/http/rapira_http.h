@@ -4,13 +4,13 @@
 #include "rapira_sapi.h"
 
 // rust glue
-extern void rapira_rs_exchange_drop(void *job);
+extern void rapira_rs_exchange_drop(void *unit);
 extern bool rapira_rs_http_server_name(zval *return_value);
 extern zend_long rapira_rs_http_server_port(void);
 
 // C data sits before zend_object std, as in rapira_sapi.h
 typedef struct {
-    void *job; // Box<ExchangeState> -> owned by Rust, NULLing when released
+    void *unit; // Box<ExchangeState> -> owned by Rust, NULLing when released
     zval request; // cached Rapira\Http\Request; IS_UNDEF until getRequest()
     zend_object std;
 } rapira_exchange_obj;

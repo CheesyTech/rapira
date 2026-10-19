@@ -1125,7 +1125,7 @@ impl Conn {
     }
 
     /// The client walking away mid-response.
-    pub fn abandon(self) {
+    pub fn leave(self) {
         let _ = self.s.shutdown(std::net::Shutdown::Both);
     }
 

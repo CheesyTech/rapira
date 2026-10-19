@@ -55,7 +55,7 @@ unsafe extern "C" {
 /// Mirrors `rapira_exchange_obj` in rapira_http.h. The C fields sit before `std`.
 #[repr(C)]
 pub struct ExchangeObj {
-    pub job: *mut c_void,
+    pub unit: *mut c_void,
     pub request: zval,
     pub std: zend_object,
 }

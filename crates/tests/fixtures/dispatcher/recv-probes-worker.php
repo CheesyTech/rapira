@@ -1,6 +1,6 @@
 <?php
 
-// Probes an empty channel: the test never creates a handle, so no job can precede the probes.
+// Probes an empty channel: the test never creates a handle, so no unit can precede the probes.
 
 use Rapira\Exception\TimeoutException;
 

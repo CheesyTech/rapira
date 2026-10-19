@@ -124,7 +124,7 @@ async fn unary(
     }
     // A closed channel means that PHP lost the call. Dropping this future closes the call for PHP.
     let Ok(reply) = reply.await else {
-        tracing::warn!(target: "grpc", "{path}: the worker lost the call");
+        tracing::warn!(target: "grpc", "{path}: the app lost the call");
         return Err(ConnectError::internal("internal error"));
     };
     let message = match reply.outcome {

@@ -24,7 +24,7 @@ thread_local! {
     static Q: RefCell<QuotaState> = RefCell::new(QuotaState::default());
 }
 
-/// Install on the PHP worker thread before the first job.
+/// Install on the PHP worker thread before the first unit.
 pub(crate) fn install(max_requests: u64, stopper: Stopper) {
     Q.with_borrow_mut(|q| {
         *q = QuotaState {

@@ -19,16 +19,16 @@ use crate::{
 };
 
 thread_local! {
-    static JOB_RX: RefCell<Option<JobRx>> = const { RefCell::new(None) };
+    static UNIT_RX: RefCell<Option<UnitRx>> = const { RefCell::new(None) };
 }
 
-struct JobRx {
+struct UnitRx {
     rx: Receiver<Box<dyn Work>>,
     /// The `pending` field of this worker's scoreboard slot.
     pending: &'static AtomicU64,
 }
 
-impl JobRx {
+impl UnitRx {
     /// Waits for one unit, with no time limit when `timeout` is None. A pulled unit leaves `pending`.
     fn recv(&self, timeout: Option<Duration>) -> Pulled {
         let got = match timeout {
@@ -36,9 +36,9 @@ impl JobRx {
             Some(t) => self.rx.recv_timeout(t),
         };
         match got {
-            Ok(job) => {
+            Ok(unit) => {
                 self.pending.fetch_sub(1, Ordering::Relaxed);
-                Pulled::Job(job)
+                Pulled::Unit(unit)
             }
             Err(RecvTimeoutError::Timeout) => Pulled::Timeout,
             Err(RecvTimeoutError::Disconnected) => Pulled::Closed,
@@ -153,7 +153,7 @@ impl Rapira {
             worker_main(
                 mode,
                 entrypoint,
-                JobRx {
+                UnitRx {
                     rx: intake_rx,
                     pending,
                 },
@@ -192,8 +192,8 @@ impl Drop for Rapira {
 }
 
 /// NTS inits module and request on different threads, so the call stack is re-initialized on this thread: https://github.com/php/php-src/pull/9104
-fn worker_main(mode: Mode, entrypoint: PathBuf, rx: JobRx, classes: DispatcherClasses) {
-    JOB_RX.with_borrow_mut(|slot| *slot = Some(rx));
+fn worker_main(mode: Mode, entrypoint: PathBuf, rx: UnitRx, classes: DispatcherClasses) {
+    UNIT_RX.with_borrow_mut(|slot| *slot = Some(rx));
     if mode == Mode::Dispatcher {
         crate::exchange::set_classes(classes);
     }
@@ -229,54 +229,54 @@ pub(crate) unsafe fn run_script(script: &Path) -> bool {
     }
 }
 
-pub(crate) fn pull_job() -> Option<Box<dyn Work>> {
-    match pull_job_wait(None) {
-        Pulled::Job(job) => Some(job),
+pub(crate) fn pull_unit() -> Option<Box<dyn Work>> {
+    match pull_unit_wait(None) {
+        Pulled::Unit(unit) => Some(unit),
         _ => None,
     }
 }
 
 pub(crate) enum Pulled {
-    Job(Box<dyn Work>),
+    Unit(Box<dyn Work>),
     Timeout,
     Empty,
     Closed,
 }
 
 /// Idle covers only the park: control returns to PHP as Active on every arm, or the master watchdog skips a worker spinning after a no-unit return.
-pub(crate) fn pull_job_wait(timeout: Option<Duration>) -> Pulled {
-    JOB_RX.with_borrow(|slot| {
-        let Some(job_r) = slot.as_ref() else {
+pub(crate) fn pull_unit_wait(timeout: Option<Duration>) -> Pulled {
+    UNIT_RX.with_borrow(|slot| {
+        let Some(unit_r) = slot.as_ref() else {
             return Pulled::Closed;
         };
         sb_update(Event::Idle);
-        let pulled = job_r.recv(timeout);
+        let pulled = unit_r.recv(timeout);
         sb_update(Event::Active);
         pulled
     })
 }
 
 /// The host pulls a unit to shed it after a failed boot cycle, and waits at most `timeout`. Before this pull, the worker stored starting, or draining after the drain decision. The pull keeps the state.
-pub(crate) fn pull_job_to_shed(timeout: Duration) -> Pulled {
-    JOB_RX.with_borrow(|slot| match slot.as_ref() {
-        Some(job_r) => job_r.recv(Some(timeout)),
+pub(crate) fn pull_unit_to_shed(timeout: Duration) -> Pulled {
+    UNIT_RX.with_borrow(|slot| match slot.as_ref() {
+        Some(unit_r) => unit_r.recv(Some(timeout)),
         None => Pulled::Closed,
     })
 }
 
 /// The Idle/Active pair still runs: a polling worker must refresh last_activity_ms or the master watchdog TERMs it as a stuck request (`Pool::watchdog_tick`).
-pub(crate) fn pull_job_try() -> Pulled {
-    JOB_RX.with_borrow_mut(|slot| {
-        let Some(job_r) = slot.as_mut() else {
+pub(crate) fn pull_unit_try() -> Pulled {
+    UNIT_RX.with_borrow_mut(|slot| {
+        let Some(unit_r) = slot.as_mut() else {
             return Pulled::Closed;
         };
         sb_update(Event::Idle);
-        let got = job_r.rx.try_recv();
+        let got = unit_r.rx.try_recv();
         sb_update(Event::Active);
         match got {
-            Ok(job) => {
-                job_r.pending.fetch_sub(1, Ordering::Relaxed);
-                Pulled::Job(job)
+            Ok(unit) => {
+                unit_r.pending.fetch_sub(1, Ordering::Relaxed);
+                Pulled::Unit(unit)
             }
             Err(TryRecvError::Empty) => Pulled::Empty,
             Err(TryRecvError::Disconnected) => Pulled::Closed,
@@ -285,8 +285,8 @@ pub(crate) fn pull_job_try() -> Pulled {
 }
 
 pub(crate) fn pending_depth() -> u64 {
-    JOB_RX.with_borrow(|slot| {
+    UNIT_RX.with_borrow(|slot| {
         slot.as_ref()
-            .map_or(0, |job_r| job_r.pending.load(Ordering::Relaxed))
+            .map_or(0, |unit_r| unit_r.pending.load(Ordering::Relaxed))
     })
 }

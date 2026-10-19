@@ -38,7 +38,7 @@ ZEND_FUNCTION(Rapira_get_dispatcher) {
                                 "get_dispatcher");
 }
 
-// a nested handle_request() would rebind SG(server_context) over the live job
+// a nested handle_request() would rebind SG(server_context) over the live unit
 static bool rapira_in_handle_request = false;
 
 ZEND_FUNCTION(Rapira_handle_request) {
@@ -51,7 +51,7 @@ ZEND_FUNCTION(Rapira_handle_request) {
     if (rapira_mode != RAPIRA_MODE_WORKER) {
         zend_throw_exception(
             rapira_ce_not_in_worker_mode_error,
-            "no host hands jobs to this process outside worker mode", 0);
+            "no host hands units to this process outside worker mode", 0);
         RETURN_THROWS();
     }
     if (rapira_in_handle_request) {

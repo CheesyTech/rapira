@@ -1,5 +1,5 @@
 <?php
-// RINIT resets imap_errorstack and RSHUTDOWN frees it (PECL imap php_imap.c); rapira reloads the module per job, so an error must not reach the next request.
+// RINIT resets imap_errorstack and RSHUTDOWN frees it (PECL imap php_imap.c); rapira reloads the module per unit, so an error must not reach the next request.
 $handler = static function (): void {
 	if (!extension_loaded('imap')) {
 		echo 'skip';

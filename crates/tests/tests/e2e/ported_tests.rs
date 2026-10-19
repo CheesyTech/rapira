@@ -614,9 +614,9 @@ fn uncaught_exception_after_output_worker() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Per-job teardown must not destruct bootstrap-resident objects and must keep object-store handles reusable across jobs.
+/// Per-unit teardown must not destruct bootstrap-resident objects and must keep object-store handles reusable across units.
 #[test]
-fn no_destructor_sweep_between_jobs_worker() -> anyhow::Result<()> {
+fn no_destructor_sweep_between_units_worker() -> anyhow::Result<()> {
     let srv = Spawn::http(
         Mode::Worker,
         fixture("ported_tests/preloop-destruct-worker.php"),
@@ -629,20 +629,20 @@ fn no_destructor_sweep_between_jobs_worker() -> anyhow::Result<()> {
     assert!(b1.contains("write=ok dtors=0"), "req1 (got {b1:?})");
     assert!(
         b2.contains("write=ok dtors=0"),
-        "bootstrap object was destructed between jobs (got {b2:?})"
+        "bootstrap object was destructed between units (got {b2:?})"
     );
     let id = |b: &str| b.split("id=").nth(1).map(str::to_owned);
     assert_eq!(
         id(&b1),
         id(&b2),
-        "the per-job object's handle must be reused, not grow monotonically"
+        "the per-unit object's handle must be reused, not grow monotonically"
     );
     Ok(())
 }
 
-/// A destructor that throws while the job's shutdown-function table is freed must not leak a pending exception into the resident loop.
+/// A destructor that throws while the unit's shutdown-function table is freed must not leak a pending exception into the resident loop.
 #[test]
-fn throwing_destructor_after_job_stays_contained_worker() -> anyhow::Result<()> {
+fn throwing_destructor_after_unit_stays_contained_worker() -> anyhow::Result<()> {
     let srv = Spawn::http(
         Mode::Worker,
         fixture("ported_tests/dtor-throw-shutdown-worker.php"),
@@ -655,7 +655,7 @@ fn throwing_destructor_after_job_stays_contained_worker() -> anyhow::Result<()> 
     assert_eq!(
         (s2, b2.as_str()),
         (200, "served=2"),
-        "the cycle must survive a throwing post-job destructor"
+        "the cycle must survive a throwing post-unit destructor"
     );
     Ok(())
 }
@@ -674,14 +674,14 @@ fn boot_shutdown_function_fires_once_at_worker_exit() -> anyhow::Result<()> {
         assert_eq!(status, 200);
         assert_eq!(
             body, "fired=0",
-            "a boot-registered shutdown function must not run at a job's end"
+            "a boot-registered shutdown function must not run at a unit's end"
         );
     }
 
     assert_eq!(
         app_messages(&srv.log_file(), "boot-shutdown fired="),
         Vec::<String>::new(),
-        "the boot function must not run while the worker serves jobs"
+        "the boot function must not run while the worker serves units"
     );
 
     srv.stop();
@@ -693,38 +693,38 @@ fn boot_shutdown_function_fires_once_at_worker_exit() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// A shutdown function registered during a job runs at the end of that job, exactly once. The boot-registered one fires once, at cycle end.
+/// A shutdown function registered during a unit runs at the end of that unit, exactly once. The boot-registered one fires once, at cycle end.
 #[test]
-fn job_shutdown_function_fires_at_end_of_its_job() -> anyhow::Result<()> {
+fn unit_shutdown_function_fires_at_end_of_its_unit() -> anyhow::Result<()> {
     let mut srv = Spawn::http(
         Mode::Worker,
-        fixture("ported_tests/job-shutdown-worker.php"),
+        fixture("ported_tests/unit-shutdown-worker.php"),
     )
     .json_log()
     .spawn();
     for want in [
-        "req=1 job_fired=0 boot_fired=0",
-        "req=2 job_fired=1 boot_fired=0",
-        "req=3 job_fired=1 boot_fired=0",
+        "req=1 unit_fired=0 boot_fired=0",
+        "req=2 unit_fired=1 boot_fired=0",
+        "req=3 unit_fired=1 boot_fired=0",
     ] {
-        let (status, body) = drain(submit(srv.addr, req("/job-shutdown-worker.php"))?);
+        let (status, body) = drain(submit(srv.addr, req("/unit-shutdown-worker.php"))?);
         assert_eq!((status, body.as_str()), (200, want));
     }
 
     assert_eq!(
-        app_messages(&srv.log_file(), "job-fixture "),
-        vec!["job-fixture job fired=1".to_owned()],
-        "only the job-registered function runs while the worker serves jobs"
+        app_messages(&srv.log_file(), "unit-fixture "),
+        vec!["unit-fixture unit fired=1".to_owned()],
+        "only the unit-registered function runs while the worker serves units"
     );
 
     srv.stop();
     assert_eq!(
-        app_messages(&srv.log_file(), "job-fixture "),
+        app_messages(&srv.log_file(), "unit-fixture "),
         vec![
-            "job-fixture job fired=1".to_owned(),
-            "job-fixture boot fired=1".to_owned(),
+            "unit-fixture unit fired=1".to_owned(),
+            "unit-fixture boot fired=1".to_owned(),
         ],
-        "at worker exit the boot function fires once and the job function does not run again"
+        "at worker exit the boot function fires once and the unit function does not run again"
     );
     Ok(())
 }
@@ -746,7 +746,7 @@ fn late_shutdown_function_runs_after_boot_entries() -> anyhow::Result<()> {
     assert_eq!(
         app_messages(&srv.log_file(), "sd "),
         Vec::<String>::new(),
-        "no shutdown function runs while the worker serves jobs"
+        "no shutdown function runs while the worker serves units"
     );
 
     srv.stop();
@@ -784,7 +784,7 @@ fn fatal_in_boot_shutdown_function_exits_clean() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// A refcount-1 object in a bare boot-level global must stay in the symbol table across jobs; its __destruct runs once, at cycle end.
+/// A refcount-1 object in a bare boot-level global must stay in the symbol table across units; its __destruct runs once, at cycle end.
 #[test]
 fn boot_global_object_survives_requests() -> anyhow::Result<()> {
     let mut srv = Spawn::http(Mode::Worker, fixture("ported_tests/boot-global-worker.php"))
@@ -801,7 +801,7 @@ fn boot_global_object_survives_requests() -> anyhow::Result<()> {
     assert_eq!(
         app_messages(&srv.log_file(), "boot-kernel destructed").len(),
         0,
-        "no __destruct while the worker serves jobs"
+        "no __destruct while the worker serves units"
     );
 
     srv.stop();

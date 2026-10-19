@@ -2,13 +2,13 @@ use crate::{
     callbacks::{finalize_response, send_error_head},
     context::{bind_server_context, populate_request_context, unbind_server_context},
     scoreboard::{Event, sb_update},
-    start::{pull_job, run_script},
+    start::{pull_unit, run_script},
     types::Context,
     *,
 };
 
 pub(crate) fn classic_worker() {
-    while let Some(unit) = pull_job() {
+    while let Some(unit) = pull_unit() {
         let Some(mut ctx) = unit.into_cgi() else {
             unreachable!("a unit with no CGI form goes to dispatcher-mode workers only");
         };

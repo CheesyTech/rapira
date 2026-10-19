@@ -18,7 +18,7 @@ pub(crate) use crate::{
     rapira_ce_no_dispatcher_error, rapira_ce_timeout_exception, rapira_ce_unix_address,
     rapira_dispatcher_info_obj, rapira_receive_timed, rapira_receive_untimed,
     scoreboard::{Event, sb_update},
-    start::{Pulled, pending_depth, pull_job_try, pull_job_wait},
+    start::{Pulled, pending_depth, pull_unit_try, pull_unit_wait},
     types::Addr,
     zend, zval, zval_add_ref, zval_ptr_dtor,
 };

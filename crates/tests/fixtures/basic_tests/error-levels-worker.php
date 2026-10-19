@@ -1,5 +1,5 @@
 <?php
-// the engine fills PG(last_error_*) whatever the mask is, so the teardown log is the only place error_reporting() can still be honoured; set at bootstrap because worker mode restores INI per cycle, not per job
+// the engine fills PG(last_error_*) whatever the mask is, so the teardown log is the only place error_reporting() can still be honoured; set at bootstrap because worker mode restores INI per cycle, not per unit
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 
 $handler = static function (): void {

@@ -285,7 +285,7 @@ fn worker_bootstrap_that_never_serves_failboots() {
 
 /// A client that walks away mid-handler must not take the worker down: the abort recycles the cycle and the next request is served.
 #[test]
-fn worker_survives_client_abandon() {
+fn worker_survives_client_leaving() {
     let srv = spawn_with_config("lifecycle/hold-worker.php", 1, "mode = \"worker\"\n");
     let mut c = Conn::open(srv.addr, Duration::from_secs(10)).expect("connect");
     c.send(b"GET / HTTP/1.1\r\nHost: e2e\r\n\r\n")
@@ -295,7 +295,7 @@ fn worker_survives_client_abandon() {
         "\n{}",
         diagnostics(&srv)
     );
-    c.abandon();
+    c.leave();
 
     let (code, body) = http_get(srv.addr, "/?probe=1", Duration::from_secs(10)).expect("GET");
     assert_eq!(code, 200, "\n{}", diagnostics(&srv));
@@ -304,7 +304,7 @@ fn worker_survives_client_abandon() {
 
 /// An unfinalized exchange whose client left is discarded by the next `receive()`, and the discard is logged.
 #[test]
-fn abandoned_exchange_is_discarded_by_next_receive() {
+fn cancelled_exchange_is_discarded_by_next_receive() {
     let srv = spawn_without_rust_log(
         "lifecycle/cancelled-receive-worker.php",
         1,
@@ -330,7 +330,7 @@ fn abandoned_exchange_is_discarded_by_next_receive() {
     client
         .read_body_until(b"data: connected\n\n", BOOT)
         .unwrap_or_else(|e| panic!("/events body: {e}\n{}", diagnostics(&srv)));
-    client.abandon();
+    client.leave();
 
     let (status, body) = http_get(srv.addr, "/next", BOOT)
         .unwrap_or_else(|e| panic!("GET /next: {e}\n{}", diagnostics(&srv)));

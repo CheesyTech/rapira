@@ -154,11 +154,11 @@ try {
             $ex->writeBody(sprintf('name=%s port=%d', $info->serverName(), $info->serverPort()));
             continue;
         }
-        if ($probe === 'abandon') {
+        if ($probe === 'lose') {
             unset($ex); // never finalized: the plugin must fail this unit and keep serving
             continue;
         }
-        if ($probe === 'abandon-mid') {
+        if ($probe === 'lose-mid') {
             $ex->writeHead(200);
             $ex->writeBody('partial', eos: false);
             unset($ex); // head already on the wire: the plugin can only truncate

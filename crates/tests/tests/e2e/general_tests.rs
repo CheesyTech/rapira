@@ -74,7 +74,7 @@ fn uncaught_throwable_reaches_exception_handler() -> anyhow::Result<()> {
     .spawn();
     let (s1, b1) = drain(submit(srv.addr, req("/"))?);
     let (s2, b2) = drain(submit(srv.addr, req("/"))?);
-    // The slot counts a job before its response goes out, so both jobs are counted here.
+    // The slot counts a unit before its response goes out, so both units are counted here.
     let slot = slot_line(&srv, "handled 2 errors");
 
     assert_eq!(s1, 200);
@@ -177,7 +177,7 @@ fn fatal_backtrace_freed_between_requests() -> anyhow::Result<()> {
     let leaked = mem(drain(submit(srv.addr, req("/?step=probe"))?).1) - b0;
     assert!(
         leaked < 5 * 1024 * 1024,
-        "fatal backtrace must be freed between jobs; {leaked} bytes still pinned (~20MB pre-fix)"
+        "fatal backtrace must be freed between units; {leaked} bytes still pinned (~20MB pre-fix)"
     );
     Ok(())
 }
