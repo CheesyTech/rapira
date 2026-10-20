@@ -630,6 +630,58 @@ fn cached_entries_answer_until_they_go_stale() {
     let _ = std::fs::remove_dir_all(&root);
 }
 
+/// An HTTP date holds a time from 1970 up to the year 9999. A file with an mtime outside that
+/// range gets 200 without `ETag` and `Last-Modified`, the same as a file without an mtime. Only
+/// the lower end is tested here: ext4 limits an mtime to the year 2446. The unit test in
+/// crates/middleware/static_files/src/cache.rs covers both ends.
+/// https://www.kernel.org/doc/html/latest/filesystems/ext4/inodes.html#inode-timestamps
+#[test]
+fn a_file_with_an_mtime_before_1970_has_no_validators() {
+    let root = static_root(&[]);
+    // 1960-01-01T00:00:00Z and 1950-01-01T00:00:00Z.
+    let y1960 = SystemTime::UNIX_EPOCH - Duration::from_secs(315_619_200);
+    let y1950 = SystemTime::UNIX_EPOCH - Duration::from_secs(631_152_000);
+    write_at_time(&root.join("old.txt"), "aaaaaa", y1960);
+    write_at_time(&root.join("epoch.txt"), "epoch", SystemTime::UNIX_EPOCH);
+    let srv = spawn_echo_loop(&root, None);
+
+    let raw = http_get_raw(srv.addr, "/old.txt", &[], T)
+        .unwrap_or_else(|e| panic!("GET /old.txt: {e}\n{}", diagnostics(&srv)));
+    assert_eq!(split_response(&raw), (200, &b"aaaaaa"[..]));
+    assert_eq!(head_field(&raw, "x-rapira-target"), "");
+    assert_eq!(head_field(&raw, "etag"), "");
+    assert_eq!(head_field(&raw, "last-modified"), "");
+
+    let raw = http_raw_bytes(
+        srv.addr,
+        b"HEAD /old.txt HTTP/1.1\r\nHost: e2e\r\nConnection: close\r\n\r\n",
+        T,
+    )
+    .expect("HEAD /old.txt");
+    assert_eq!(split_response(&raw), (200, &b""[..]));
+    assert_eq!(head_field(&raw, "content-length"), "6");
+    assert_eq!(head_field(&raw, "etag"), "");
+    assert_eq!(head_field(&raw, "last-modified"), "");
+
+    let raw = http_get_raw(srv.addr, "/epoch.txt", &[], T).expect("GET /epoch.txt");
+    assert_eq!(split_response(&raw), (200, &b"epoch"[..]));
+    assert_eq!(
+        head_field(&raw, "last-modified"),
+        "Thu, 01 Jan 1970 00:00:00 GMT"
+    );
+    assert!(!head_field(&raw, "etag").is_empty(), "no etag");
+
+    // Both bodies have six bytes. Only the mtime shows the difference, and an HTTP date
+    // cannot hold either mtime.
+    write_at_time(&root.join("old.txt"), "bbbbbb", y1950);
+    // An entry is fresh for one second (TTL in crates/middleware/static_files/src/cache.rs).
+    std::thread::sleep(Duration::from_millis(1100));
+    let raw = http_get_raw(srv.addr, "/old.txt", &[], T).expect("GET /old.txt after the rewrite");
+    assert_eq!(split_response(&raw), (200, &b"bbbbbb"[..]));
+
+    let _ = std::fs::remove_dir_all(&root);
+}
+
 /// A 000 directory passes a stat of its own path and a 0400 directory lists but cannot resolve child paths, so the boot probe must resolve inside the root.
 #[test]
 fn a_bad_static_root_refuses_to_boot() {
@@ -726,11 +778,19 @@ fn split_response(raw: &[u8]) -> (u16, &[u8]) {
 /// keeps only the seconds of the mtime.
 /// https://www.kernel.org/doc/html/latest/filesystems/ext4/inodes.html#inode-timestamps
 fn write_at(path: &Path, contents: &str, mtime_secs: u64) {
+    write_at_time(
+        path,
+        contents,
+        SystemTime::UNIX_EPOCH + Duration::from_secs(mtime_secs),
+    );
+}
+
+fn write_at_time(path: &Path, contents: &str, mtime: SystemTime) {
     std::fs::write(path, contents).expect("write static file");
     std::fs::File::options()
         .write(true)
         .open(path)
         .expect("open for mtime")
-        .set_modified(SystemTime::UNIX_EPOCH + Duration::from_secs(mtime_secs))
+        .set_modified(mtime)
         .expect("set mtime");
 }

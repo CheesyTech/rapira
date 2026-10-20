@@ -31,7 +31,7 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::task::{Context, Poll};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use bytes::Bytes;
 use tokio::io::{AsyncRead, AsyncSeek, ReadBuf};
@@ -47,6 +47,10 @@ const TTL: Duration = Duration::from_secs(1);
 /// The cache adds this value to the size of each entry. It covers the entry and the map slot.
 /// The bodies alone understate the memory of a root that holds many small files.
 const ENTRY_OVERHEAD: usize = 256;
+/// An HTTP date holds a time from the epoch up to this offset, 10000-01-01T00:00:00Z, but not
+/// the offset itself. httpdate panics for a time outside this range.
+/// https://docs.rs/httpdate/1.0.3/src/httpdate/date.rs.html#47-57
+const HTTP_DATE_END: Duration = Duration::from_secs(253_402_300_800);
 
 #[derive(Clone, Copy)]
 pub(crate) struct CachedMeta {
@@ -68,6 +72,8 @@ impl CachedMeta {
     /// Equal values therefore give the client the same validators. The comparison holds no
     /// device number and no inode number. The cache does not detect a replacement that keeps
     /// the mtime and the length.
+    /// The comparison uses the mtime from the stat, also an mtime that an HTTP date cannot
+    /// hold. The cache therefore detects a change of such an mtime.
     /// TODO!: probably here we need to add device and inode numbers to detect better.
     fn same_file(&self, other: &Self) -> bool {
         self.modified == other.modified && self.len == other.len
@@ -80,10 +86,15 @@ impl Metadata for CachedMeta {
     }
 
     /// `ServeDir` calls `.ok()` on this result. An absent mtime gives no ETag and no
-    /// `Last-Modified`. This result is `Err` only when `std::fs::Metadata::modified` is also
-    /// `Err` for the same file.
+    /// `Last-Modified`. This result is `Err` when `std::fs::Metadata::modified` is also `Err`
+    /// for the same file. It is also `Err` when an HTTP date cannot hold the mtime, because
+    /// `ServeDir` formats `Last-Modified` with httpdate.
     fn modified(&self) -> io::Result<SystemTime> {
         self.modified
+            .filter(|t| {
+                t.duration_since(UNIX_EPOCH)
+                    .is_ok_and(|d| d < HTTP_DATE_END)
+            })
             .ok_or_else(|| io::Error::other("modification time is not available"))
     }
 
@@ -352,5 +363,30 @@ impl Backend for CachingBackend {
             return Box::pin(ready(Ok(file)));
         }
         Box::pin(self.clone().fill(path))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The rows are the instants next to the two ends of the range that httpdate formats.
+    #[test]
+    fn modified_gives_only_an_mtime_that_an_http_date_holds() {
+        let end = UNIX_EPOCH + HTTP_DATE_END;
+        let tick = Duration::from_nanos(1);
+        for (mtime, given) in [
+            (UNIX_EPOCH - tick, false),
+            (UNIX_EPOCH, true),
+            (end - tick, true),
+            (end, false),
+        ] {
+            let meta = CachedMeta {
+                is_dir: false,
+                modified: Some(mtime),
+                len: 0,
+            };
+            assert_eq!(meta.modified().is_ok(), given, "{mtime:?}");
+        }
     }
 }
